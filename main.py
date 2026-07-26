@@ -10,6 +10,7 @@ contract", https://maritime.sh/docs/frameworks/custom):
 Everything else (sleep/wake, per-user VMs, channels, billing) is platform.
 """
 
+import asyncio
 import os
 
 from crewai import LLM, Agent, Crew, Task
@@ -56,5 +57,16 @@ async def chat(body: dict):
         expected_output="a clear, brief answer to the user's message",
         agent=assistant,
     )
-    result = Crew(agents=[assistant], tasks=[task], verbose=False).kickoff()
+    crew = Crew(agents=[assistant], tasks=[task], verbose=False)
+    # kickoff() is synchronous and refuses to run inside FastAPI's event
+    # loop; a worker thread keeps this version-proof.
+    result = await asyncio.to_thread(crew.kickoff)
     return {"response": str(result)}
+
+
+@app.get("/schedules")
+def schedules():
+    # Maritime polls this to register wake triggers for scheduled work.
+    # Return entries like {"id": "morning", "cron": "35 9 * * *",
+    # "tz": "UTC", "prompt": "...", "enabled": true} when you have some.
+    return []
