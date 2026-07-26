@@ -19,20 +19,24 @@ app = FastAPI()
 
 # Maritime injects OPENAI_API_KEY (a metered proxy token unless you set your
 # own) and OPENAI_BASE_URL. Passing both explicitly works on every CrewAI /
-# LiteLLM version regardless of which env var spelling it honors.
-llm = LLM(
-    model=os.getenv("MODEL", "gpt-4o-mini"),
-    api_key=os.environ["OPENAI_API_KEY"],
-    base_url=os.getenv("OPENAI_BASE_URL") or None,
-)
-
-assistant = Agent(
-    role="helpful assistant",
-    goal="answer the user's message clearly and briefly",
-    backstory="You are a concise, friendly assistant running as a Maritime agent.",
-    llm=llm,
-    verbose=False,
-)
+# LiteLLM version regardless of which env var spelling it honors. Never crash
+# at import when the key is missing: this process is PID 1 in a micro-VM, and
+# an import crash means a kernel panic boot loop instead of a useful error.
+_api_key = os.getenv("OPENAI_API_KEY", "")
+assistant = None
+if _api_key:
+    llm = LLM(
+        model=os.getenv("MODEL", "gpt-4o-mini"),
+        api_key=_api_key,
+        base_url=os.getenv("OPENAI_BASE_URL") or None,
+    )
+    assistant = Agent(
+        role="helpful assistant",
+        goal="answer the user's message clearly and briefly",
+        backstory="You are a concise, friendly assistant running as a Maritime agent.",
+        llm=llm,
+        verbose=False,
+    )
 
 
 @app.get("/health")
@@ -42,6 +46,8 @@ def health():
 
 @app.post("/chat")
 async def chat(body: dict):
+    if assistant is None:
+        return {"response": "no OPENAI_API_KEY is set for this agent; add one in the dashboard (Environment tab) and restart"}
     message = body.get("message", "")
     if not message:
         return {"response": "say something and i'll answer"}
