@@ -10,5 +10,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
-# $PORT is injected by Maritime (18789 inside micro-VMs). Never hardcode 8080.
-CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8080}"]
+# $PORT is injected by Maritime (18789 inside micro-VMs). Never hardcode 8080,
+# and never use a shell-string CMD (sh -c "...") — micro-VM init flattens the
+# CMD to one string, so nested quoting breaks. start.py reads $PORT itself.
+CMD ["python", "start.py"]

@@ -18,6 +18,11 @@ https://maritime.sh/docs/frameworks/custom and https://maritime.sh/llms.txt.
   snapshotted and resumed (not restarted) across sleep, so never trust cached
   wall-clock time and reconnect long-lived sockets lazily.
 - Keep `ca-certificates` in the Dockerfile (slim images lack it; HTTPS dies).
+- NEVER use a shell-string CMD like `CMD ["sh", "-c", "uvicorn ... $PORT"]`.
+  Micro-VM init re-executes the CMD as one flattened string, nested quoting
+  breaks, the process dies as PID 1, and the VM kernel-panics on boot. Launch
+  through a real program instead (this repo's `start.py` reads `$PORT` in
+  Python and calls uvicorn directly).
 
 ## LLM access
 
