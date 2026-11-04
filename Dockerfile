@@ -1,16 +1,8 @@
-FROM python:3.12-slim
-
-# ca-certificates: slim images ship without it and every HTTPS call fails.
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
-
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-COPY . .
-
-# $PORT is injected by Maritime (18789 inside micro-VMs). Never hardcode 8080,
-# and never use a shell-string CMD (sh -c "...") — micro-VM init flattens the
-# CMD to one string, so nested quoting breaks. start.py reads $PORT itself.
-CMD ["python", "start.py"]
+FROM node:22-slim AS dependencies
+WORKDIR /fixture
+COPY dependency-lock .
+RUN node -e 'const fs = require("fs"); const crypto = require("crypto"); const ITERATIONS = 500000; const KEY_BYTES = 32; const input = fs.readFileSync("dependency-lock"); fs.writeFileSync("dependency-proof", crypto.pbkdf2Sync(input, "staging-cache-fixture", ITERATIONS, KEY_BYTES, "sha256").toString("hex"));'
+FROM node:22-slim
+COPY --from=dependencies /fixture/dependency-proof /dependency-proof
+COPY source-marker /source-marker
+CMD ["sleep", "infinity"]
